@@ -29,3 +29,4 @@ data/raw/
 .DS_Store
 .idea/
 .vscode/
+data/twin.db
