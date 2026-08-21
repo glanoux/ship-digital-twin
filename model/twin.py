@@ -34,6 +34,7 @@ class TwinSnapshot:
     fuel_range_nm: float | None
     avg_fuel_rate_lph: float | None
     sim_time_s: float
+    fouling_pct: float
 
 
 class ShipTwin:
@@ -82,6 +83,7 @@ class ShipTwin:
             fuel_range_nm=fuel_range,
             avg_fuel_rate_lph=avg_rate,
             sim_time_s=row["sim_time_s"],
+            fouling_pct=row["fouling_pct"],  # simulation-only ground truth, see model/performance.py
         )
 
     def track(self, limit: int = 2000):

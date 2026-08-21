@@ -28,7 +28,8 @@ CREATE TABLE IF NOT EXISTS telemetry (
     fuel_level_l REAL NOT NULL,
     fuel_rate_lph REAL NOT NULL,
     engine_temp_c REAL NOT NULL,
-    waypoint_idx INTEGER NOT NULL
+    waypoint_idx INTEGER NOT NULL,
+    fouling_pct REAL NOT NULL
 );
 """
 
@@ -57,9 +58,9 @@ def insert_telemetry(row: dict) -> None:
             """
             INSERT INTO telemetry (
                 sim_time_s, wall_time, lat, lon, heading_deg, speed_knots,
-                rpm, fuel_level_l, fuel_rate_lph, engine_temp_c, waypoint_idx
+                rpm, fuel_level_l, fuel_rate_lph, engine_temp_c, waypoint_idx, fouling_pct
             ) VALUES (:sim_time_s, :wall_time, :lat, :lon, :heading_deg, :speed_knots,
-                      :rpm, :fuel_level_l, :fuel_rate_lph, :engine_temp_c, :waypoint_idx)
+                      :rpm, :fuel_level_l, :fuel_rate_lph, :engine_temp_c, :waypoint_idx, :fouling_pct)
             """,
             row,
         )

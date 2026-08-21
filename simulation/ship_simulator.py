@@ -36,7 +36,16 @@ SPEED_INERTIA_PER_SIMHOUR = 6.0         # how fast speed approaches target
 WAYPOINT_ARRIVAL_NM = 1.0
 
 FUEL_CAPACITY_L = 20_000.0
-FUEL_K = 0.55  # fuel_rate_lph = FUEL_K * speed_knots^3
+FUEL_K = 0.55  # as-built calm-water curve: fuel_rate_lph = FUEL_K * speed_knots^3
+
+# Hull fouling: a slow, unmeasured real-world effect that makes the ship burn
+# more fuel than its as-built curve predicts for the same speed. No sensor
+# reports this directly -- it's exactly the kind of hidden state a predictive
+# twin is for, inferred by comparing actual vs. expected fuel burn (see
+# model/performance.py). Grows a few % every sim-hour so it's visible within
+# a demo session.
+FOULING_GROWTH_PCT_PER_SIMHOUR = 0.4
+FOULING_MAX_PCT = 50.0
 
 TIME_ACCEL_S = 60.0  # sim-seconds simulated per real second (1 real min = 1 sim hour)
 
@@ -80,6 +89,7 @@ class ShipState:
         self.waypoint_idx = 0
         self.direction = 1  # ping-pong through WAYPOINTS
         self.sim_time_s = 0.0
+        self.fouling_pct = 0.0  # ground truth, simulation-only (see FOULING_GROWTH_PCT_PER_SIMHOUR)
 
     def target_waypoint(self):
         return WAYPOINTS[self.waypoint_idx + self.direction]
@@ -116,7 +126,10 @@ class ShipState:
         base_rpm = 90.0 * self.speed + 20.0
         self.rpm = max(0.0, base_rpm + rng.normal(0, 15))
 
-        fuel_rate = FUEL_K * (self.speed ** 3) + rng.normal(0, 3)
+        self.fouling_pct = min(FOULING_MAX_PCT, self.fouling_pct + FOULING_GROWTH_PCT_PER_SIMHOUR * dt_h)
+        fouling_mult = 1.0 + self.fouling_pct / 100.0
+
+        fuel_rate = FUEL_K * (self.speed ** 3) * fouling_mult + rng.normal(0, 3)
         fuel_rate = max(fuel_rate, 0.0)
         self.fuel_level = max(0.0, self.fuel_level - fuel_rate * dt_h)
 
@@ -135,6 +148,7 @@ class ShipState:
             "fuel_rate_lph": fuel_rate,
             "engine_temp_c": self.engine_temp,
             "waypoint_idx": self.waypoint_idx,
+            "fouling_pct": self.fouling_pct,
         }
 
 
@@ -154,6 +168,7 @@ def run(hz: float, reset: bool, duration_s: float | None, seed: int | None):
             ship.engine_temp = row["engine_temp_c"]
             ship.waypoint_idx = row["waypoint_idx"]
             ship.sim_time_s = row["sim_time_s"]
+            ship.fouling_pct = row["fouling_pct"]
 
     tick_period = 1.0 / hz
     started = time.time()

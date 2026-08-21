@@ -20,7 +20,7 @@ dashboard" or "just a simulation":
 | **Physical asset** | The real thing being twinned. Produces raw sensor data. | `simulation/ship_simulator.py` — simulates a ship instead of using a real one, so we can build everything else without hardware. |
 | **Ingestion / sync layer** | Gets raw readings from the asset into a form the twin can use. In production: MQTT, Kafka, a REST API, OPC-UA, etc. | `ingestion/store.py` — a SQLite table the simulator writes into and everything else reads from. |
 | **Twin (the virtual model)** | Holds current + historical state, and *derives* things: predictions, estimates, anomaly flags. This is the part that makes it a twin and not just a data feed. | `model/twin.py` — `ShipTwin` computes fuel range, ETA, etc. from raw telemetry + simple physics assumptions. |
-| **Consumers** | Whoever/whatever uses the twin: dashboards, alerts, optimizers, control systems. | `viz/dashboard.py` — a Streamlit dashboard. Later: a fuel-optimization module in the same `model/` layer. |
+| **Consumers** | Whoever/whatever uses the twin: dashboards, alerts, optimizers, control systems. | `viz/dashboard.py` — a Streamlit dashboard, including the fuel-performance panel below. |
 
 The key architectural idea: **consumers never talk to the physical asset
 directly, and the twin never talks to the physical asset directly either —
@@ -31,12 +31,21 @@ the simulator for a real ship later without touching the dashboard.
 
 - **Descriptive** — mirrors current state. "Here's the ship's speed right
   now." (What `get_latest()` gives you.)
-- **Predictive** — uses a model (physics-based or ML) to forecast forward.
-  "At this fuel-consumption rate, you have 340 nm of range left." (What
-  `ShipTwin.snapshot()` starts doing with `fuel_range_nm` / `eta_next_wp_hours`.)
-  This is also where the *fuel/performance* phase of this project fits: a
-  model comparing actual fuel burn against an expected baseline to flag
-  hull fouling, engine degradation, or weather impact.
+- **Predictive** — uses a model (physics-based or ML) to forecast forward, or
+  to surface a hidden condition the raw sensors don't report. Two examples
+  in this repo:
+  - `ShipTwin.snapshot()`'s `fuel_range_nm` / `eta_next_wp_hours` — forecasts
+    forward from current state.
+  - `model/performance.py` — compares actual fuel burn against `BASELINE_FUEL_K`,
+    the ship's as-built calm-water curve. The simulator models hull fouling as
+    a slow, *unmeasured* real-world effect (`FOULING_GROWTH_PCT_PER_SIMHOUR`
+    in `ship_simulator.py`) that raises actual fuel burn above the baseline
+    over time. `performance.py` never reads that hidden state — it only sees
+    telemetry (speed, actual fuel rate) — and still recovers the trend from
+    the actual-vs-expected gap. That's the general shape of predictive
+    maintenance: infer a condition nothing measures directly, from things
+    that are measured. The dashboard shows both the twin's estimate and the
+    simulation's ground truth side by side so you can see the inference working.
 - **Prescriptive** — recommends or takes action. "Reduce speed to 14 kn to
   make port with fuel margin" or, further still, sends that command back to
   the real ship. Not implemented here, but it's the natural next step after
@@ -54,9 +63,10 @@ nothing downstream changes.
 
 ## Where this project goes next
 
-1. ~~Training/visualization twin~~ (this phase): simulate a ship, sync its
-   state, visualize it live.
-2. **Fuel & performance**: add a baseline "expected fuel consumption" model
-   (e.g. from calm-water speed/power curves) and have the twin compare
-   actual vs. expected — this is a real use case (hull fouling detection,
-   route efficiency) and demonstrates the "predictive" fidelity level.
+1. ~~Training/visualization twin~~: simulate a ship, sync its state, visualize it live.
+2. ~~Fuel & performance~~: baseline "expected fuel consumption" model, twin
+   compares actual vs. expected to flag hull fouling — demonstrates the
+   "predictive" fidelity level.
+3. **Prescriptive**: use the performance model to recommend an action (e.g.
+   "reduce speed to hold the same range margin given current fouling") rather
+   than just reporting a status.

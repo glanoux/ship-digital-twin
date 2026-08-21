@@ -6,14 +6,16 @@ Built as a learning project — see [`docs/concepts.md`](docs/concepts.md) for w
 
 ## Status
 
-Phase 1 done: a simulated ship, synced live into a twin, visualized on a dashboard. Phase 2 (fuel & performance modeling) is next.
+Phase 1 & 2 done: a simulated ship synced live into a twin, visualized on a
+dashboard, with a predictive fuel-performance panel (hull fouling detection
+from telemetry alone). Phase 3 (prescriptive: recommend an action) is next.
 
 ## Project structure
 
 ```
 data/            SQLite store (twin.db) holding the telemetry time series
 ingestion/       Sync layer: writes/reads telemetry (ingestion/store.py)
-model/           The twin itself: state + derived estimates (model/twin.py)
+model/           The twin: state + estimates (twin.py), predictive fuel model (performance.py)
 simulation/      Stands in for the real ship (simulation/ship_simulator.py)
 viz/             Live dashboard (viz/dashboard.py)
 docs/            concepts.md — digital twin theory mapped to this code
@@ -44,8 +46,8 @@ accelerated time (1 real minute ≈ 1 sim hour), refueling each time it reaches 
 
 ## Possible components (future work)
 
-- **Fuel & performance**: compare actual vs. expected fuel consumption to flag
-  hull fouling / route inefficiency (next phase — see `docs/concepts.md`)
+- **Prescriptive twin**: use `model/performance.py`'s deviation estimate to
+  recommend an action (e.g. speed adjustment to hold range margin) instead of
+  just reporting status — see `docs/concepts.md`
 - **Real data source**: swap the simulator for live sensor feed (AIS, engine
   telemetry, IMU, GPS) without changing ingestion/model/viz
-- **Prescriptive twin**: recommend or send speed/route adjustments back to the ship

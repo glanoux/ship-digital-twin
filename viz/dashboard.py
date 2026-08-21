@@ -19,6 +19,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
+from model import performance as perf
 from model.twin import ShipTwin
 from simulation.ship_simulator import WAYPOINTS
 
@@ -108,6 +109,29 @@ def make_map(track_df, snap):
     return fig
 
 
+def make_perf_chart(df):
+    fig = go.Figure()
+    fig.add_trace(
+        go.Scatter(
+            x=df["sim_hours"], y=df["fuel_rate_lph"],
+            mode="lines", line=dict(width=2, color="orange"), name="actual",
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=df["sim_hours"], y=df["expected_fuel_rate_lph"],
+            mode="lines", line=dict(width=2, color="gray", dash="dash"), name="expected (baseline)",
+        )
+    )
+    fig.update_layout(
+        height=280, margin=dict(l=10, r=10, t=10, b=10),
+        xaxis_title="sim hours", yaxis_title="fuel rate (L/h)",
+        legend=dict(orientation="h", yanchor="bottom", y=1.02),
+        transition=dict(duration=400, easing="cubic-in-out"),
+    )
+    return fig
+
+
 @st.fragment(run_every="2s")
 def live_view():
     snap = twin.snapshot()
@@ -116,6 +140,7 @@ def live_view():
     hist = twin.track(limit=2000)
     df = pd.DataFrame(hist)
     df["sim_hours"] = df["sim_time_s"] / 3600.0
+    df["expected_fuel_rate_lph"] = perf.expected_fuel_rate_lph(df["speed_knots"])
 
     col_map, col_gauges = st.columns([2, 1])
 
@@ -141,6 +166,34 @@ def live_view():
     c1, c2 = st.columns(2)
     c1.line_chart(df.set_index("sim_hours")[["speed_knots"]])
     c2.line_chart(df.set_index("sim_hours")[["fuel_level_l"]])
+
+    st.subheader("Fuel & performance (predictive twin)")
+    st.caption(
+        "Actual fuel burn vs. the ship's as-built baseline curve, computed purely from "
+        "speed + fuel-rate telemetry -- no sensor tells the twin about hull condition directly."
+    )
+    report = perf.analyze(hist)
+    p1, p2 = st.columns([1, 2])
+    with p1:
+        if report.avg_deviation_pct is not None:
+            st.metric("Excess fuel burn vs. baseline", f"{report.avg_deviation_pct:+.1f} %")
+        else:
+            st.metric("Excess fuel burn vs. baseline", "—")
+        if report.status == "nominal":
+            st.success(f"Status: {report.status}")
+        elif report.status == "elevated -- monitor":
+            st.warning(f"Status: {report.status}")
+        elif report.status == "insufficient data":
+            st.info(f"Status: {report.status}")
+        else:
+            st.error(f"Status: {report.status}")
+        st.caption(
+            f"Simulation ground truth (not visible to a real twin): "
+            f"hull fouling is currently +{snap.fouling_pct:.1f}% -- "
+            "compare to the estimate above to see the twin tracking it correctly."
+        )
+    with p2:
+        st.plotly_chart(make_perf_chart(df), use_container_width=True, key="perf_chart")
 
 
 live_view()
