@@ -20,7 +20,7 @@ dashboard" or "just a simulation":
 | **Physical asset** | The real thing being twinned. Produces raw sensor data. | `simulation/ship_simulator.py` — simulates a ship instead of using a real one, so we can build everything else without hardware. |
 | **Ingestion / sync layer** | Gets raw readings from the asset into a form the twin can use. In production: MQTT, Kafka, a REST API, OPC-UA, etc. | `ingestion/store.py` — a SQLite table the simulator writes into and everything else reads from. |
 | **Twin (the virtual model)** | Holds current + historical state, and *derives* things: predictions, estimates, anomaly flags. This is the part that makes it a twin and not just a data feed. | `model/twin.py` — `ShipTwin` computes fuel range, ETA, etc. from raw telemetry + simple physics assumptions. |
-| **Consumers** | Whoever/whatever uses the twin: dashboards, alerts, optimizers, control systems. | `viz/dashboard.py` — a Streamlit dashboard, including the fuel-performance panel below. |
+| **Consumers** | Whoever/whatever uses the twin: dashboards, alerts, optimizers, control systems. | `viz/dashboard.py` (Streamlit) and `unity/` (a 3D view), both reading the twin — the dashboard in-process via `model/twin.py`, Unity over HTTP via `api/server.py`. |
 
 The key architectural idea: **consumers never talk to the physical asset
 directly, and the twin never talks to the physical asset directly either —
@@ -51,6 +51,25 @@ the simulator for a real ship later without touching the dashboard.
   the real ship. Not implemented here, but it's the natural next step after
   predictive: a feedback loop from the twin back to the asset.
 
+## Multiple consumers, one twin
+
+A twin is only worth building once if more than one thing can use it without
+each needing its own copy of the logic. This repo has two consumers now:
+`viz/dashboard.py` and the Unity viewer in `unity/`. They show the same data
+(and can show it *inconsistently* if built carelessly — that's the actual
+risk multiple consumers introduce) but neither contains any twin logic
+itself:
+
+- The dashboard is Python in the same process, so it calls `ShipTwin` directly.
+- Unity is a separate process in a different language, so it goes through
+  `api/server.py`, a thin HTTP layer that calls the exact same `ShipTwin`
+  and just serializes the result to JSON.
+
+Neither consumer talks to the simulator, the SQLite store, or each other.
+If `model/twin.py`'s fuel-range estimate changes, both consumers pick it up
+automatically — that's the payoff of putting the logic in one place instead
+of reimplementing "estimate fuel range" separately in Python and C#.
+
 ## Why simulate the ship instead of using real data?
 
 Real ship telemetry needs hardware access, sensor protocols, and possibly
@@ -67,6 +86,9 @@ nothing downstream changes.
 2. ~~Fuel & performance~~: baseline "expected fuel consumption" model, twin
    compares actual vs. expected to flag hull fouling — demonstrates the
    "predictive" fidelity level.
-3. **Prescriptive**: use the performance model to recommend an action (e.g.
+3. ~~Multiple consumers~~: an HTTP bridge (`api/server.py`) and a 3D Unity
+   viewer (`unity/`) reading the same twin as the dashboard, over the network
+   instead of in-process.
+4. **Prescriptive**: use the performance model to recommend an action (e.g.
    "reduce speed to hold the same range margin given current fouling") rather
    than just reporting a status.

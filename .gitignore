@@ -30,3 +30,16 @@ data/raw/
 .idea/
 .vscode/
 data/twin.db
+
+# Unity (generated/cache -- the actual project isn't checked in, see unity/README.md)
+unity/*/Library/
+unity/*/Temp/
+unity/*/Obj/
+unity/*/Build/
+unity/*/Builds/
+unity/*/Logs/
+unity/*/UserSettings/
+unity/*/.vs/
+unity/*/*.csproj
+unity/*/*.sln
+unity/*/*.user
