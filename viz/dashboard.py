@@ -50,7 +50,10 @@ def make_gauge(value, title, max_val, suffix=""):
             gauge={"axis": {"range": [0, max_val]}},
         )
     )
-    fig.update_layout(height=220, margin=dict(l=20, r=20, t=40, b=10))
+    fig.update_layout(
+        height=220, margin=dict(l=20, r=20, t=40, b=10),
+        transition=dict(duration=400, easing="cubic-in-out"),
+    )
     return fig
 
 
@@ -100,6 +103,7 @@ def make_map(track_df, snap):
         margin=dict(l=0, r=0, t=0, b=0),
         height=520,
         showlegend=False,
+        transition=dict(duration=400, easing="cubic-in-out"),
     )
     return fig
 
@@ -116,15 +120,15 @@ def live_view():
     col_map, col_gauges = st.columns([2, 1])
 
     with col_map:
-        st.plotly_chart(make_map(df, snap), use_container_width=True)
+        st.plotly_chart(make_map(df, snap), use_container_width=True, key="map_chart")
 
     with col_gauges:
         g1, g2 = st.columns(2)
-        g1.plotly_chart(make_gauge(snap.speed_knots, "Speed", 25, " kn"), use_container_width=True)
-        g2.plotly_chart(make_gauge(snap.rpm, "RPM", 2200), use_container_width=True)
+        g1.plotly_chart(make_gauge(snap.speed_knots, "Speed", 25, " kn"), use_container_width=True, key="gauge_speed")
+        g2.plotly_chart(make_gauge(snap.rpm, "RPM", 2200), use_container_width=True, key="gauge_rpm")
         g3, g4 = st.columns(2)
-        g3.plotly_chart(make_gauge(snap.fuel_pct, "Fuel", 100, " %"), use_container_width=True)
-        g4.plotly_chart(make_gauge(snap.engine_temp_c, "Engine temp", 120, " °C"), use_container_width=True)
+        g3.plotly_chart(make_gauge(snap.fuel_pct, "Fuel", 100, " %"), use_container_width=True, key="gauge_fuel")
+        g4.plotly_chart(make_gauge(snap.engine_temp_c, "Engine temp", 120, " °C"), use_container_width=True, key="gauge_engine_temp")
 
     st.subheader("Twin-derived estimates")
     m1, m2, m3, m4 = st.columns(4)
